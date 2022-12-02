@@ -3,12 +3,14 @@ import { distinctBy } from "./deps/std/collections.ts";
 import { assertObject, isString } from "./deps/unknownutil.ts";
 import { functions } from "./function.ts";
 import { romToHira } from "./kana/rom_hira.ts";
+import { azikToHira } from "./kana/azik_hira.ts";
 import { romToZen } from "./kana/rom_zen.ts";
 import type { KanaResult, KanaTable } from "./kana/type.ts";
 import { Cell } from "./util.ts";
 
 const tables: Cell<Record<string, KanaTable>> = new Cell(() => ({
   "rom": romToHira,
+  "azik": azikToHira,
   "zen": romToZen,
 }));
 
