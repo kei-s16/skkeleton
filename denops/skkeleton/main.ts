@@ -1,5 +1,4 @@
 import { config, setConfig } from "./config.ts";
-import { Context } from "./context.ts";
 import { anonymous, autocmd, Denops, fn, op, vars } from "./deps.ts";
 import {
   AssertError,
@@ -10,14 +9,13 @@ import {
 import { functions } from "./function.ts";
 import { disable as disableFunc } from "./function/disable.ts";
 import { modeChange } from "./function/mode.ts";
-import * as jisyo from "./jisyo.ts";
-import { currentLibrary, SkkServer } from "./jisyo.ts";
+import { load as jisyoLoad, SkkServer } from "./jisyo.ts";
 import { currentKanaTable, registerKanaTable } from "./kana.ts";
 import { handleKey, registerKeyMap } from "./keymap.ts";
 import { keyToNotation, notationToKey, receiveNotation } from "./notation.ts";
 import { initializeState } from "./state.ts";
+import { currentContext, currentLibrary } from "./store.ts";
 import type { CompletionData, RankData, SkkServerOptions } from "./types.ts";
-import { Cell } from "./util.ts";
 
 type Opts = {
   key: string;
@@ -33,8 +31,6 @@ function assertOpts(x: any): asserts x is Opts {
 }
 
 let initialized = false;
-
-export const currentContext = new Cell(() => new Context());
 
 function homeExpand(path: string, homePath: string): string {
   if (path[0] === "~") {
@@ -92,8 +88,8 @@ async function init(denops: Denops) {
           return [homeExpand(cfg[0], homePath), cfg[1]];
         }
       });
-  jisyo.currentLibrary.setInitializer(async () =>
-    await jisyo.load(
+  currentLibrary.setInitializer(async () =>
+    await jisyoLoad(
       globalDictionaries,
       {
         path: homeExpand(userJisyo, homePath),
@@ -198,15 +194,12 @@ function handleCompleteKey(
 }
 
 type CompleteInfo = {
-  // Note: This is not implemeted in native completion
-  inserted?: string;
-  items?: string[];
-  // deno-lint-ignore camelcase
   pum_visible: boolean;
   selected: number;
 };
 
 type VimStatus = {
+  prevInput: string;
   completeInfo: CompleteInfo;
   completeType: string;
   mode: string;
@@ -218,7 +211,8 @@ async function handle(
 ): Promise<string> {
   assertOpts(opts);
   const key = opts.key;
-  const { completeInfo, completeType, mode } = vimStatus as VimStatus;
+  const { prevInput, completeInfo, completeType, mode } =
+    vimStatus as VimStatus;
   const context = currentContext.get();
   context.vimMode = mode;
   if (completeInfo.pum_visible) {
@@ -226,28 +220,11 @@ async function handle(
       console.log("input after complete");
     }
     const notation = keyToNotation[notationToKey[key]];
-    const completed = !!(
-      completeType === "native"
-        ? completeInfo.inserted
-        : completeInfo.selected >= 0
-    );
     if (config.debug) {
       console.log({
         completeType,
-        inserted: completeInfo.inserted,
         selected: completeInfo.selected,
       });
-    }
-    if (completed) {
-      if (config.debug) {
-        console.log("candidate selected");
-        console.log({
-          candidate: completeInfo.items?.[completeInfo.selected],
-          context: context.toString(),
-        });
-      }
-      initializeState(context.state, ["converter"]);
-      context.preEdit.output("");
     }
     const handled = handleCompleteKey(
       completeInfo.selected >= 0,
@@ -257,6 +234,11 @@ async function handle(
     if (isString(handled)) {
       return handled;
     }
+  }
+  // 補完の後などpreEditとバッファが不一致している状態の時にリセットする
+  if (!prevInput.endsWith(context.toString())) {
+    initializeState(context.state, ["converter"]);
+    context.preEdit.output("");
   }
   const before = context.mode;
   if (opts.function) {
@@ -353,16 +335,6 @@ export async function main(denops: Denops) {
         word: kana,
         candidate: word,
       };
-      // <C-y>で呼ばれた際にstateの初期化を行う
-      // この際、preEditと候補の仮名の先頭が一致している
-      const preEdit = context.toString();
-      if (
-        preEdit.length > config.markerHenkan.length &&
-        preEdit.startsWith(config.markerHenkan)
-      ) {
-        initializeState(context.state, ["converter"]);
-        context.preEdit.output("");
-      }
     },
     // deno-lint-ignore require-await
     async getConfig() {

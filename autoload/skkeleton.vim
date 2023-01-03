@@ -48,11 +48,16 @@ function! skkeleton#config(config) abort
 endfunction
 
 function! skkeleton#register_keymap(state, key, func_name)
+  if a:key[0] !=# '<'
     let key = keytrans(a:key)
+  else
+    let key = a:key
+  endif
   " normalize notation
   if len(key) != 1
     let key = tolower(key)
   endif
+  let g:hoge = add(get(g:, 'hoge', []), key)
   call skkeleton#request_async('registerKeyMap', [a:state, key, a:func_name])
 endfunction
 
@@ -77,7 +82,7 @@ endfunction
 function! s:complete_info() abort
   if exists('*pum#visible') && pum#visible()
     return ['pum.vim', pum#complete_info()]
-  elseif has('nvim') && luaeval('pcall(require, "cmp") and require("cmp").visible()')
+  elseif has('nvim') && luaeval('select(2, pcall(function() return package.loaded["cmp"].visible() end)) == true')
     let selected = luaeval('require("cmp").get_active_entry() ~= nil')
     return ['cmp', {'pum_visible': v:true, 'selected': selected ? 1 : -1}]
   else
@@ -88,7 +93,13 @@ endfunction
 function! skkeleton#vim_status() abort
   let [complete_type, complete_info] = s:complete_info()
   let m = mode()
+  if m ==# 'i'
+    let prev_input = getline('.')[:col('.')-2]
+  else
+    let prev_input = getcmdline()[:getcmdpos()-2]
+  endif
   return {
+  \ 'prevInput': prev_input,
   \ 'completeInfo': complete_info,
   \ 'completeType': complete_type,
   \ 'mode': m,
@@ -139,7 +150,7 @@ function! skkeleton#get_default_mapped_keys() abort "{{{
                 \]
 endfunction "}}}
 
-let g:skkeleton#mapped_keys = skkeleton#get_default_mapped_keys()
+let g:skkeleton#mapped_keys = extend(get(g:, 'skkeleton#mapped_keys', []), skkeleton#get_default_mapped_keys())
 
 function! skkeleton#map() abort
   if mode() ==# 'n'
@@ -149,10 +160,9 @@ function! skkeleton#map() abort
   endif
   for c in g:skkeleton#mapped_keys
     " notation to lower
-    if len(c) > 1 && c[0] ==# '<'
-      let k = '<lt>' .. tolower(c[1:])
-      " normalize notation
-      let k = get(g:skkeleton#notation#key_to_notation, get(g:skkeleton#notation#notation_to_key, k), k)
+    if len(c) > 1 && c[0] ==# '<' && c !=? '<bar>'
+      let k = keytrans(eval('"\' .. c .. '"'))
+      let k = '<lt>' .. tolower(k[1:])
     else
       let k = c
     endif
@@ -171,81 +181,6 @@ function! skkeleton#unmap() abort
   for c in skkeleton#get_default_mapped_keys()
     silent! execute printf('lunmap <buffer> %s', c)
   endfor
-endfunction
-
-function! skkeleton#get_key_notations() abort
-  let keys = {}
-  let keys['<nul>'] = "\<nul>"
-  let keys['<bs>'] = "\<bs>"
-  let keys['<tab>'] = "\<tab>"
-  let keys['<s-tab>'] = "\<s-tab>"
-  let keys['<nl>'] = "\<nl>"
-  let keys['<ff>'] = "\<ff>"
-  let keys['<cr>'] = "\<cr>"
-  let keys['<return>'] = "\<return>"
-  let keys['<enter>'] = "\<enter>"
-  let keys['<esc>'] = "\<esc>"
-  let keys['<space>'] = "\<space>"
-  let keys['<lt>'] = "\<lt>"
-  let keys['<bslash>'] = "\<bslash>"
-  let keys['<bar>'] = "\<bar>"
-  let keys['<del>'] = "\<del>"
-  let keys['<csi>'] = "\<csi>"
-  let keys['<xcsi>'] = "\<xcsi>"
-  let keys['<eol>'] = "\<eol>"
-  let keys['<ignore>'] = "\<ignore>"
-  let keys['<nop>'] = "\<nop>"
-  let keys['<up>'] = "\<up>"
-  let keys['<down>'] = "\<down>"
-  let keys['<left>'] = "\<left>"
-  let keys['<right>'] = "\<right>"
-  let keys['<s-up>'] = "\<s-up>"
-  let keys['<s-down>'] = "\<s-down>"
-  let keys['<s-left>'] = "\<s-left>"
-  let keys['<s-right>'] = "\<s-right>"
-  let keys['<c-left>'] = "\<c-left>"
-  let keys['<c-right>'] = "\<c-right>"
-  let keys['<help>'] = "\<help>"
-  let keys['<undo>'] = "\<undo>"
-  let keys['<insert>'] = "\<insert>"
-  let keys['<home>'] = "\<home>"
-  let keys['<end>'] = "\<end>"
-  let keys['<pageup>'] = "\<pageup>"
-  let keys['<pagedown>'] = "\<pagedown>"
-  let keys['<kup>'] = "\<kup>"
-  let keys['<kdown>'] = "\<kdown>"
-  let keys['<kleft>'] = "\<kleft>"
-  let keys['<kright>'] = "\<kright>"
-  let keys['<khome>'] = "\<khome>"
-  let keys['<kend>'] = "\<kend>"
-  let keys['<korigin>'] = "\<korigin>"
-  let keys['<kpageup>'] = "\<kpageup>"
-  let keys['<kpagedown>'] = "\<kpagedown>"
-  let keys['<kdel>'] = "\<kdel>"
-  let keys['<kplus>'] = "\<kplus>"
-  let keys['<kminus>'] = "\<kminus>"
-  let keys['<kmultiply>'] = "\<kmultiply>"
-  let keys['<kdivide>'] = "\<kdivide>"
-  let keys['<kpoint>'] = "\<kpoint>"
-  let keys['<kcomma>'] = "\<kcomma>"
-  let keys['<kequal>'] = "\<kequal>"
-  let keys['<kenter>'] = "\<kenter>"
-  for i in range(1, 12)
-    execute printf('let keys["<f%s>"] = "\<f%s>"', i, i)
-    execute printf('let keys["<s-f%s>"] = "\<s-f%s>"', i, i)
-  endfor
-  for i in range(0, 9)
-    execute printf('let keys["<k%s>"] = "\<k%s>"', i, i)
-  endfor
-  for i in range(26)
-    let c = nr2char(i + 97)
-    execute printf('let keys["<s-%s>"] = "\<s-%s>"', c, c)
-    execute printf('let keys["<c-%s>"] = "\<c-%s>"', c, c)
-    execute printf('let keys["<m-%s>"] = "\<m-%s>"', c, c)
-    execute printf('let keys["<a-%s>"] = "\<a-%s>"', c, c)
-    execute printf('let keys["<d-%s>"] = "\<d-%s>"', c, c)
-  endfor
-  return keys
 endfunction
 
 let s:windows = []
