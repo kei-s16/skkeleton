@@ -1,4 +1,3 @@
-import { disable } from "../function/disable.ts";
 import { henkanFirst } from "../function/henkan.ts";
 import { henkanPoint } from "../function/input.ts";
 import { abbrev, zenkaku } from "../function/mode.ts";
