@@ -9,7 +9,7 @@ export const azikToHira: KanaTable = [
   [" ", henkanFirst],
   ["^", henkanPoint],
   ["'", katakana], // NOTE: JIS配列の場合はオプションで上書きが必要
-  ["<s-\>", zenkaku],
+  ["<s-l>", zenkaku],
   ["/", abbrev],
   // 記号
   ["!", ["！", ""]],
