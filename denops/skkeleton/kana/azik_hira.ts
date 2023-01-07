@@ -8,7 +8,6 @@ export const azikToHira: KanaTable = [
   // SKKのキーマップ
   [" ", henkanFirst],
   ["^", henkanPoint],
-  ["'", katakana], // NOTE: JIS配列の場合はオプションで上書きが必要
   ["<s-l>", zenkaku],
   ["/", abbrev],
   // 記号
